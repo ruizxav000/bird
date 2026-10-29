@@ -67,6 +67,19 @@ off the reference frames. Sexes look alike.
 - `build.py`: assembles the scene: camera (330 mm, f/5.6, motion blur), low sun, sky.
 - `render.py`: renders stills or the animation.
 
+## Interactive viewer (`web/`)
+
+`src/export_web.py` runs the same generators at web resolution and packs the
+model (about 8,000 feather cards, loose barbs, wings, tail, bill, feet,
+branch) into `web/model.js`. `web/index.html` is a three.js viewer that
+re-creates the feather shading (frayed barbs, shaft streaks, downy bases),
+the low golden sun, and the look-around choreography. You can orbit, zoom,
+and toggle the animation.
+
+```bash
+/opt/bpyenv/bin/python src/export_web.py
+```
+
 ## Reproduce
 
 ```bash

@@ -1,0 +1,544 @@
+<title>Lilac-breasted Roller</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one full-bleed sky stage holding the live model; field-guide
+   labels float over it like annotations on a plate. Single deliberate look:
+   the hazy cyan savanna sky from the reference footage, in any theme. */
+:root {
+  --sky-top: #7fb9c9;
+  --sky-low: #a9d3db;
+  --ink: #11262c;
+  --ink-soft: #3c5961;
+  --paper: rgba(246, 250, 250, 0.84);
+  --paper-solid: #f3f8f8;
+  --rule: rgba(17, 38, 44, 0.14);
+  --ultra: #2a3aa8;
+  --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-low) 100%);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+#stage { position: fixed; inset: 0; touch-action: none; }
+#stage canvas { display: block; width: 100%; height: 100%; outline: none; }
+
+.plate {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 18px);
+  left: max(16px, env(safe-area-inset-left, 0px));
+  max-width: min(360px, calc(100% - 32px));
+  display: grid;
+  gap: 4px;
+  pointer-events: none;
+}
+.plate h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 6vw, 46px);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.plate .sci {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(18px, 3.4vw, 22px);
+  color: var(--ink-soft);
+}
+.plate .meas {
+  margin-top: 6px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+}
+.bar button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 500 13px/1 var(--font-body);
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bar button:hover { background: rgba(17, 38, 44, 0.07); }
+.bar button[aria-pressed="true"] { background: var(--ink); color: var(--paper-solid); }
+.bar button:focus-visible, .marks button:focus-visible { outline: 2px solid var(--ultra); outline-offset: 2px; }
+
+.marks {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 18px);
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: 264px;
+  max-height: calc(100% - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 14px 16px 12px;
+  box-sizing: border-box;
+}
+.marks h2 {
+  margin: 0 0 8px;
+  font: 500 11px/1.2 var(--font-data);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.marks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.marks li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; font-size: 13px; line-height: 1.3; }
+.marks li span.sw { width: 14px; height: 14px; border-radius: 50%; margin-top: 1px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+.marks li b { font-weight: 600; }
+.marks li em { font-style: normal; color: var(--ink-soft); display: block; }
+.marks p { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+
+.hint {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+  font: 400 11px/1 var(--font-data);
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  pointer-events: none;
+}
+#status {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 400 13px/1.4 var(--font-data);
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  pointer-events: none;
+  text-align: center;
+  padding-inline: 24px;
+}
+@media (max-width: 480px) {
+  .bar { gap: 2px; padding: 4px; }
+  .bar button { font-size: 12px; padding: 9px 9px; }
+}
+@media (max-width: 760px) {
+  .marks { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); left: max(16px, env(safe-area-inset-left, 0px)); width: auto; max-height: 42%; }
+  .hint { display: none; }
+}
+</style>
+
+<div id="stage" aria-label="Interactive 3D model of a Lilac-breasted Roller perched on a dead branch"></div>
+
+<header class="plate">
+  <h1>Lilac-breasted Roller</h1>
+  <div class="sci">Coracias caudatus</div>
+  <div class="meas">37 cm incl. 8&ndash;9 cm streamers &middot; 104 g &middot; sexes alike</div>
+</header>
+
+<aside class="marks" id="marks" aria-label="Field marks">
+  <h2>Field marks</h2>
+  <ul>
+    <li><span class="sw" style="background:#ede8d6"></span><div><b>Forehead &amp; eyebrow</b><em>creamy white</em></div></li>
+    <li><span class="sw" style="background:#0c0b0a"></span><div><b>Eye-stripe</b><em>black, gape through the eye</em></div></li>
+    <li><span class="sw" style="background:#a8b376"></span><div><b>Crown &rarr; nape</b><em>yellow-green to green-turquoise</em></div></li>
+    <li><span class="sw" style="background:#db7552"></span><div><b>Cheeks</b><em>rufous, grading into lilac</em></div></li>
+    <li><span class="sw" style="background:#cc63a8"></span><div><b>Throat &amp; breast</b><em>lilac with white shaft streaks</em></div></li>
+    <li><span class="sw" style="background:#38a8b3"></span><div><b>Belly &amp; flanks</b><em>turquoise, paler at the vent</em></div></li>
+    <li><span class="sw" style="background:#a16936"></span><div><b>Back, scapulars, tertials</b><em>cinnamon-brown</em></div></li>
+    <li><span class="sw" style="background:#2a3aa8"></span><div><b>Bend of wing</b><em>deep ultramarine lesser coverts</em></div></li>
+    <li><span class="sw" style="background:#4da3d1"></span><div><b>Flight feathers</b><em>azure, deep violet, blackish tips</em></div></li>
+    <li><span class="sw" style="background:#08080b"></span><div><b>Tail streamers</b><em>outer pair, black; adults only</em></div></li>
+    <li><span class="sw" style="background:#b8994c"></span><div><b>Feet</b><em>yellow-olive, toes 3 &amp; 4 fused (syndactyl)</em></div></li>
+  </ul>
+  <p>About 8,000 feathers, each placed, coloured and shingled by code. The animation shows how birds scan: they hold the head still, snap it to a new direction, and hold again.</p>
+</aside>
+
+<div class="hint">Drag to orbit &middot; scroll or pinch to zoom</div>
+
+<nav class="bar" aria-label="Viewer controls">
+  <button id="btnPlay" type="button" aria-pressed="true">Look around</button>
+  <button id="btnSpin" type="button" aria-pressed="false">Auto-rotate</button>
+  <button id="btnReset" type="button">Reset view</button>
+  <button id="btnMarks" type="button" aria-pressed="true">Field marks</button>
+</nav>
+
+<div id="status">Loading feathers&hellip;</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="model.js"></script>
+<script>
+(function () {
+  "use strict";
+  const status = document.getElementById("status");
+  if (!window.THREE || !window.ROLLER_META) {
+    status.textContent = "The 3D viewer could not load. Reload the page to try again.";
+    return;
+  }
+  const META = window.ROLLER_META;
+
+  // ---------------------------------------------------------------- data
+  const raw = atob(window.ROLLER_BIN);
+  const BIN = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) BIN[i] = raw.charCodeAt(i);
+  const TYPES = { int16: Int16Array, uint16: Uint16Array, uint32: Uint32Array, uint8: Uint8Array, float32: Float32Array };
+  function view(ref) { const T = TYPES[ref[2]]; return new T(BIN.buffer, ref[0], ref[1]); }
+  function positions(m) {
+    const q = view(m.pos), out = new Float32Array(q.length), s = META.box[0] / 32767;
+    for (let i = 0; i < q.length; i++) out[i] = q[i] * s;
+    return out;
+  }
+  function srgbToLin(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  function gridIndex(n, nu, nv) {
+    const k = nu * nv, quads = (nu - 1) * (nv - 1);
+    const idx = new (n * k > 65535 ? Uint32Array : Uint16Array)(n * quads * 6);
+    let o = 0;
+    for (let c = 0; c < n; c++) {
+      const base = c * k;
+      for (let i = 0; i < nu - 1; i++) for (let j = 0; j < nv - 1; j++) {
+        const a = base + i * nv + j, b = a + nv, d = a + 1, e = b + 1;
+        idx[o++] = a; idx[o++] = b; idx[o++] = e;
+        idx[o++] = a; idx[o++] = e; idx[o++] = d;
+      }
+    }
+    return idx;
+  }
+
+  // ---------------------------------------------------------- textures
+  function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+  function noise1(x) { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return hash(i) * (1 - u) + hash(i + 1) * u; }
+  function featherTexture(fray, barbs, splits) {
+    // 4 variants stacked; x = along the feather, y = across the vane.
+    // R barb shading · B shaft mask · A vane (frayed barb tips, splits)
+    const W = 256, H = 64, V = 4;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H * V;
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(W, H * V), d = img.data;
+    for (let k = 0; k < V; k++) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const u = x / (W - 1), v = (y / (H - 1)) * 2 - 1, av = Math.abs(v);
+      const s = u * barbs - av * barbs * 0.32 + k * 17.3;
+      const stripe = 0.5 + 0.5 * Math.sin(s * Math.PI * 2);
+      const n1 = noise1(s * 0.9 + k * 5.1) * 0.65 + noise1(s * 3.1 + k) * 0.35;
+      const edge = 1 - (n1 - 0.35) * fray * 2 - stripe * fray * 0.7;
+      let a = av < edge ? 1 : 0;
+      if (splits && n1 > 0.70 && av > 0.28 && av < 0.92) a = 0;
+      const rw = 0.065 * (1 - 0.55 * u);
+      const shaft = Math.max(0, Math.min(1, 1 - (av - rw * 0.5) / (rw * 0.6)));
+      const o = ((k * H + y) * W + x) * 4;
+      d[o] = Math.round(255 * stripe); d[o + 1] = 255; d[o + 2] = Math.round(255 * shaft); d[o + 3] = a * 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);
+    t.premultiplyAlpha = false;
+    t.anisotropy = 4;
+    return t;
+  }
+  function barkTexture() {
+    const W = 256, H = 512, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(W, H), d = img.data;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const u = x / W, v = y / H;
+      const g = noise1(u * 40 + noise1(v * 6) * 3) * 0.6 + noise1(u * 110 + v * 2) * 0.4;
+      const crack = Math.pow(Math.abs(Math.sin((u * 9 + noise1(v * 14) * 0.8) * Math.PI)), 18);
+      const tone = 0.78 + 0.22 * g - crack * 0.45;
+      const o = (y * W + x) * 4;
+      d[o] = 168 * tone; d[o + 1] = 156 * tone; d[o + 2] = 140 * tone; d[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 7); t.encoding = THREE.sRGBEncoding;
+    return t;
+  }
+  function scuteTexture() {
+    const cv = document.createElement("canvas"); cv.width = 8; cv.height = 64;
+    const ctx = cv.getContext("2d"), g = ctx.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, "#6e5a2c"); g.addColorStop(0.18, "#b99d50"); g.addColorStop(0.82, "#c4a85a"); g.addColorStop(1, "#7a6432");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 8, 64);
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 1 / 0.0011); t.encoding = THREE.sRGBEncoding;
+    return t;
+  }
+
+  // ---------------------------------------------------------- materials
+  function featherMaterial(tex, opts) {
+    const m = new THREE.MeshStandardMaterial({
+      map: tex, alphaTest: 0.5, side: THREE.DoubleSide,
+      roughness: opts.rough, metalness: 0, envMapIntensity: opts.env,
+    });
+    m.alphaToCoverage = true;
+    m.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", "attribute vec3 fcol; attribute vec3 scol; attribute float rnd;\nvarying vec3 vF; varying vec3 vS; varying float vR; varying vec2 vU;\n#include <common>")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvF = fcol; vS = scol; vR = rnd; vU = uv;");
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "varying vec3 vF; varying vec3 vS; varying float vR; varying vec2 vU;\n#include <common>")
+        .replace("#include <map_fragment>", [
+          "vec2 tuv = vec2(vU.x, (floor(vR * 3.999) + vU.y) * 0.25);",
+          "vec4 t = texture2D(map, tuv);",
+          "diffuseColor.a = t.a;",
+          "vec3 F = pow(vF, vec3(2.2)); vec3 S = pow(vS, vec3(2.2));",
+          "vec3 c = mix(F, S, t.b * " + opts.shaft.toFixed(2) + ");",
+          "c *= 0.84 + 0.16 * t.r;",
+          "float down = 1.0 - smoothstep(0.10, 0.42, vU.x);",
+          "c = mix(c, c * 0.42, down * 0.6);",
+          "diffuseColor.rgb = c;",
+        ].join("\n"));
+    };
+    return m;
+  }
+  const contourTex = featherTexture(0.60, 46, true);
+  const flightTex = featherTexture(0.16, 90, false);
+  const MAT = {
+    contour: featherMaterial(contourTex, { rough: 0.62, env: 0.55, shaft: 0.75 }),
+    flight: featherMaterial(flightTex, { rough: 0.42, env: 0.8, shaft: 0.8 }),
+    skin: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
+    strands: new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }),
+    bill: new THREE.MeshPhysicalMaterial({ color: 0x0b0b0c, roughness: 0.34, clearcoat: 0.35, clearcoatRoughness: 0.3 }),
+    toe: new THREE.MeshStandardMaterial({ map: scuteTexture(), roughness: 0.55 }),
+    claw: new THREE.MeshStandardMaterial({ color: 0x1d1814, roughness: 0.35 }),
+    bark: new THREE.MeshStandardMaterial({ map: barkTexture(), roughness: 0.92 }),
+    lid: new THREE.MeshStandardMaterial({ color: 0x0a0908, roughness: 0.55 }),
+  };
+
+  // ---------------------------------------------------------- scene graph
+  const scene = new THREE.Scene();
+  const world = new THREE.Group(); scene.add(world);
+  const rp = new THREE.Vector3().fromArray(META.rigPivot);
+  const rig = new THREE.Group(); rig.position.copy(rp); world.add(rig);
+  const bodyInner = new THREE.Group(); bodyInner.position.copy(rp).negate(); rig.add(bodyInner);
+  const head = new THREE.Group(); head.position.fromArray(META.headPivot); head.scale.setScalar(META.headScale);
+  head.rotation.order = "YZX"; bodyInner.add(head);
+  const tail = new THREE.Group(); tail.position.fromArray(META.tailPivot); bodyInner.add(tail);
+  const GROUPS = { world: world, body: bodyInner, head: head, tail: tail };
+
+  for (const m of META.meshes) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(positions(m), 3));
+    let obj;
+    if (m.kind === "strands") {
+      const segs = m.segs, n = m.count / segs, cs = view(m.fcol);
+      const col = new Float32Array(m.count * 3);
+      for (let i = 0; i < n; i++) for (let j = 0; j < segs; j++) for (let c = 0; c < 3; c++)
+        col[(i * segs + j) * 3 + c] = srgbToLin(cs[i * 3 + c] / 255) * 0.8;
+      g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      const idx = new Uint32Array(n * (segs - 1) * 2);
+      let o = 0;
+      for (let i = 0; i < n; i++) for (let j = 0; j < segs - 1; j++) { idx[o++] = i * segs + j; idx[o++] = i * segs + j + 1; }
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      obj = new THREE.LineSegments(g, MAT.strands);
+    } else {
+      if (m.grid) g.setIndex(new THREE.BufferAttribute(gridIndex(m.grid[0], m.grid[1], m.grid[2]), 1));
+      else g.setIndex(new THREE.BufferAttribute(view(m.index), 1));
+      if (m.uv) {
+        const u = view(m.uv);
+        g.setAttribute("uv", u instanceof Uint8Array ? new THREE.BufferAttribute(u, 2, true) : new THREE.BufferAttribute(u, 2));
+      }
+      if (m.kind === "contour" || m.kind === "flight") {
+        g.setAttribute("fcol", new THREE.BufferAttribute(view(m.fcol), 3, true));
+        g.setAttribute("scol", new THREE.BufferAttribute(view(m.scol), 3, true));
+        g.setAttribute("rnd", new THREE.BufferAttribute(view(m.rnd), 1, true));
+      }
+      if (m.kind === "skin") {
+        const cs = view(m.fcol), col = new Float32Array(cs.length);
+        for (let i = 0; i < cs.length; i++) col[i] = srgbToLin(cs[i] / 255) * 0.35;
+        g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      }
+      g.computeVertexNormals();
+      obj = new THREE.Mesh(g, MAT[m.kind]);
+      obj.castShadow = m.kind !== "skin";
+      obj.receiveShadow = true;
+    }
+    GROUPS[m.group].add(obj);
+  }
+
+  // eyes: dark-brown iris under a glossy cornea, lids, blink caps
+  function irisTexture() {
+    const W = 64, H = 128, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(W, H), d = img.data;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const th = (y / H) * Math.PI, rho = Math.sin(Math.min(th, Math.PI / 2));
+      const fib = noise1(x * 0.9 + y * 0.05) * 0.5 + noise1(x * 2.3) * 0.5;
+      let r = 52 + 30 * fib, gg = 24 + 14 * fib, b = 10 + 6 * fib;
+      if (rho > 0.74) { r *= 0.3; gg *= 0.3; b *= 0.3; }
+      if (rho < 0.34) { r = 4; gg = 4; b = 4; }
+      if (th > Math.PI * 0.42) { r = 6; gg = 5; b = 5; }
+      const o = (y * W + x) * 4; d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+  }
+  const eyeMat = new THREE.MeshPhysicalMaterial({ map: irisTexture(), roughness: 0.4, clearcoat: 1, clearcoatRoughness: 0.03 });
+  const R = META.eye.radius, blinkCaps = [];
+  for (const sx of [1, -1]) {
+    const eg = new THREE.Group();
+    eg.position.set(META.eye.centre[0] * sx, META.eye.centre[1], META.eye.centre[2]);
+    eg.rotation.y = sx > 0 ? THREE.MathUtils.degToRad(12) : THREE.MathUtils.degToRad(168);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 24), eyeMat);
+    ball.rotation.z = -Math.PI / 2; eg.add(ball);
+    const lid = new THREE.Mesh(new THREE.TorusGeometry(R * 0.88, R * 0.09, 10, 40), MAT.lid);
+    lid.rotation.y = Math.PI / 2; lid.position.x = R * 0.47; eg.add(lid);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(R * 1.07, 32, 16, Math.PI / 2, Math.PI), MAT.lid);
+    cap.scale.y = 0.001; eg.add(cap); blinkCaps.push(cap);
+    head.add(eg);
+  }
+
+  // ---------------------------------------------------------- light
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById("stage").appendChild(renderer.domElement);
+
+  // environment for reflections: savanna sky above, warm dry ground below
+  const envScene = new THREE.Scene();
+  const envGeo = new THREE.SphereGeometry(10, 32, 16);
+  const ec = new Float32Array(envGeo.attributes.position.count * 3);
+  for (let i = 0; i < envGeo.attributes.position.count; i++) {
+    const y = envGeo.attributes.position.getY(i) / 10;
+    const top = new THREE.Color(0x8cc4d6), hor = new THREE.Color(0xd6e6e2), gnd = new THREE.Color(0x8c7656);
+    const c = y >= 0 ? hor.clone().lerp(top, Math.min(1, y * 1.6)) : hor.clone().lerp(gnd, Math.min(1, -y * 4));
+    ec[i * 3] = c.r; ec[i * 3 + 1] = c.g; ec[i * 3 + 2] = c.b;
+  }
+  envGeo.setAttribute("color", new THREE.BufferAttribute(ec, 3));
+  envScene.add(new THREE.Mesh(envGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+
+  scene.add(new THREE.HemisphereLight(0xcde8f0, 0x8a7458, 0.55));
+  const sun = new THREE.DirectionalLight(0xffd3a0, 2.6);
+  const toSun = new THREE.Vector3(0.358, 0.292, -0.887).normalize();
+  const focus = new THREE.Vector3(0, 0.065, 0.005);
+  sun.position.copy(focus).addScaledVector(toSun, 1.5);
+  sun.target.position.copy(focus);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -0.22, right: 0.22, top: 0.22, bottom: -0.22, near: 0.5, far: 2.6 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.0015;
+  scene.add(sun, sun.target);
+
+  // ---------------------------------------------------------- camera
+  const camera = new THREE.PerspectiveCamera(18, 1, 0.01, 30);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.minDistance = 0.18; controls.maxDistance = 3.0;
+  controls.autoRotateSpeed = 1.2;
+  function homeView() {
+    const aspect = camera.aspect, dist = aspect < 0.8 ? 1.75 : 1.2;
+    const az = THREE.MathUtils.degToRad(8);
+    controls.target.copy(focus).add(new THREE.Vector3(0, 0.0, 0.035));
+    camera.position.set(Math.cos(az) * dist, 0.07, -Math.sin(az) * dist).add(new THREE.Vector3(0, 0, 0.035));
+    controls.update();
+  }
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize(); homeView();
+
+  // ---------------------------------------------------------- animation
+  // (frame at 24 fps, yaw, pitch, roll) - same choreography as the film
+  const POSES = [[1, 0, 0, 0], [34, -32, -6, 4], [62, -38, -16, 14], [90, 38, 6, -3], [118, 46, 2, -6],
+                 [146, -8, -10, -8], [176, -62, 0, 4], [204, -4, 2, 0]];
+  const SNAP = 4, LOOP = 216, BLINKS = [78, 162], FLICK = 128;
+  const d2r = THREE.MathUtils.degToRad;
+  function easeOutBack(t) { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+  function headPose(f) {
+    let p = POSES[0];
+    for (let i = 1; i < POSES.length; i++) {
+      const q = POSES[i], start = q[0] - SNAP;
+      if (f < start) break;
+      if (f < q[0]) {
+        const t = easeOutBack((f - start) / SNAP);
+        return [0, 1, 2].map((k) => p[k + 1] + (q[k + 1] - p[k + 1]) * t);
+      }
+      p = q;
+    }
+    return [p[1], p[2], p[3]];
+  }
+  function applyFrame(f) {
+    const [yaw, pitch, roll] = headPose(f);
+    head.rotation.set(d2r(pitch), d2r(yaw), d2r(-roll));
+    const ph = (2 * Math.PI * f) / 24 / 1.65, s = 1 + 0.006 * Math.sin(ph);
+    rig.scale.set(1 + 0.004 * Math.sin(ph), s, s);
+    let b = 0.001;
+    for (const k of BLINKS) {
+      if (f >= k - 2 && f < k) b = (f - (k - 2)) / 2;
+      else if (f >= k && f <= k + 1) b = 1;
+      else if (f > k + 1 && f < k + 3) b = 1 - (f - (k + 1)) / 2;
+    }
+    for (const c of blinkCaps) c.scale.y = Math.max(0.001, b);
+    let a = 0;
+    const keys = [[FLICK - 2, 0], [FLICK + 1, 7], [FLICK + 6, -1.5], [FLICK + 12, 0]];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const [f0, a0] = keys[i], [f1, a1] = keys[i + 1];
+      if (f >= f0 && f < f1) { const t = (f - f0) / (f1 - f0); a = a0 + (a1 - a0) * (t * t * (3 - 2 * t)); }
+    }
+    tail.rotation.x = d2r(a);
+  }
+
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let playing = !reduce, frame = 1, last = performance.now();
+  const btnPlay = document.getElementById("btnPlay"), btnSpin = document.getElementById("btnSpin");
+  const btnMarks = document.getElementById("btnMarks"), marks = document.getElementById("marks");
+  btnPlay.setAttribute("aria-pressed", String(playing));
+  btnPlay.addEventListener("click", () => { playing = !playing; btnPlay.setAttribute("aria-pressed", String(playing)); });
+  btnSpin.addEventListener("click", () => { controls.autoRotate = !controls.autoRotate; btnSpin.setAttribute("aria-pressed", String(controls.autoRotate)); });
+  document.getElementById("btnReset").addEventListener("click", homeView);
+  if (window.innerWidth <= 760) { marks.hidden = true; btnMarks.setAttribute("aria-pressed", "false"); }
+  btnMarks.addEventListener("click", () => { marks.hidden = !marks.hidden; btnMarks.setAttribute("aria-pressed", String(!marks.hidden)); });
+
+  applyFrame(1);
+  status.hidden = true;
+  function tick(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (playing) { frame += dt * 24; if (frame >= LOOP + 1) frame -= LOOP; applyFrame(frame); }
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
