@@ -51,37 +51,39 @@ def build_bill():
     T = np.linspace(0, 1, 34)
 
     def width(t):
-        return 0.0060 * (1 - t) ** 0.75 + 0.0006
+        return 0.0060 * (1 - t) ** 0.75 + 0.0006 * (1 - t) + 0.00015
 
     def gape(t):  # gape line drops slightly toward the rictus
         return -0.0010 * (1 - t) ** 3
 
     def culmen_drop(t):  # decurved culmen + hook
         hook = np.clip((t - 0.80) / 0.20, 0, 1) ** 2
-        return -0.0016 * t ** 2 - 0.0026 * hook
+        return -0.0016 * t ** 2 - 0.0020 * hook
 
     upper, lower = [], []
     for t in T:
         c = BILL_BASE + fwd * (t * BILL_LEN)
         w = width(t)
         # upper mandible: deep, rounded culmen, lateral compression near tip
-        hu = 0.0070 * (1 - t) ** 0.85 + 0.0007
-        x, z, u = _ring(w * (1 - 0.25 * t), hu, 0.0005 + 0.0012 * (1 - t))
+        hu = 0.0070 * (1 - t) ** 0.85 + 0.0007 * (1 - t) + 0.00015
+        x, z, u = _ring(w * (1 - 0.25 * t), hu, 0.00015 + 0.0016 * (1 - t))
         g = gape(t)
         cu = c + up * (g + culmen_drop(t) * (t > 0) * 0.0)
         # bend the whole section down toward the hook
         drop = culmen_drop(t)
-        pts = [cu + lat * xi + up * (zi + drop * (0.4 + 0.6 * (zi > 0))) for xi, zi in zip(x, z)]
+        # the whole section follows the decurved culmen, so it never inverts
+        pts = [cu + lat * xi + up * (zi + drop) for xi, zi in zip(x, z)]
         upper.append((pts, u, t))
-        tl = t / 0.94
+        tl = t / 0.86  # lower mandible ends under the hook
         if tl <= 1.0:
             hl = 0.0050 * (1 - tl) ** 1.05 + 0.0004
-            x, z, u = _ring(width(t) * 0.92 * (1 - 0.3 * tl), 0.0006, hl)
-            cl = c + up * (g - 0.0004 - 0.0012 * tl ** 2)
+            # top sits slightly inside the upper mandible: closed bill, no gap
+            x, z, u = _ring(width(t) * 0.90 * (1 - 0.3 * tl), 0.0011 * (1 - tl) + 0.0002, hl)
+            cl = c + up * (g - 0.0004 - 0.0016 * tl ** 2)
             pts = [cl + lat * xi + up * zi for xi, zi in zip(x, z)]
             lower.append((pts, u, t))
-    tip_u = BILL_BASE + fwd * (BILL_LEN + 0.0007) + up * (culmen_drop(1.0) * 0.80)
-    tip_l = BILL_BASE + fwd * (BILL_LEN * 0.95) + up * (gape(0.95) - 0.0020)
+    tip_u = BILL_BASE + fwd * (BILL_LEN + 0.0004) + up * (culmen_drop(1.0) - 0.0003)
+    tip_l = BILL_BASE + fwd * (BILL_LEN * 0.875) + up * (gape(0.875) - 0.0022)
     U = _loft(upper, [tip_u])
     L = _loft(lower, [tip_l])
     return U, L

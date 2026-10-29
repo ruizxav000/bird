@@ -178,8 +178,8 @@ def bill_material():
     b = node(nt, "ShaderNodeBsdfPrincipled", (300, 0))
     link(nt, col, b.inputs["Base Color"])
     link(nt, rough.outputs["Result"], b.inputs["Roughness"])
-    b.inputs["Specular IOR Level"].default_value = 0.6
-    b.inputs["Coat Weight"].default_value = 0.25
+    b.inputs["Specular IOR Level"].default_value = 0.5
+    b.inputs["Coat Weight"].default_value = 0.15
     b.inputs["Coat Roughness"].default_value = 0.3
     bump = node(nt, "ShaderNodeBump", (0, -500))
     bump.inputs["Strength"].default_value = 0.15
