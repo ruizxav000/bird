@@ -1,7 +1,7 @@
 """Render stills or the animation from scene/roller.blend.
 
 python src/render.py still OUT.png [--frame N] [--pct P] [--samples S] [--cam NAME]
-python src/render.py anim OUTDIR [--start A] [--end B] [--pct P] [--samples S]
+python src/render.py anim OUTDIR [--start A] [--end B] [--pct P | --res WxH] [--samples S]
 """
 import os
 import sys
@@ -22,6 +22,10 @@ def main():
     bpy.ops.wm.open_mainfile(filepath=arg("--blend", os.path.join(ROOT, "scene", "roller.blend")))
     sc = bpy.context.scene
     sc.render.resolution_percentage = arg("--pct", sc.render.resolution_percentage, int)
+    res = arg("--res", None)
+    if res:  # exact output size, e.g. 720x1280
+        sc.render.resolution_x, sc.render.resolution_y = map(int, res.split("x"))
+        sc.render.resolution_percentage = 100
     sc.cycles.samples = arg("--samples", sc.cycles.samples, int)
     sc.render.threads_mode = "AUTO"
     cam = arg("--cam", None)
