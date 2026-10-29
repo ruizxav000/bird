@@ -50,8 +50,9 @@ def new_mat(name):
     return m, nt
 
 
-def feather_material(name="Feather", rough=0.55, sheen=0.35, barb_mm=0.24,
-                     barb_slope=0.9, fray=0.22, translucency=0.18, gloss=0.0):
+def feather_material(name="Feather", rough=0.55, sheen=0.45, barb_mm=0.24,
+                     barb_slope=0.9, fray=0.42, translucency=0.25, gloss=0.0,
+                     shaft_w=0.065, shaft_mix=0.75):
     m, nt = new_mat(name)
     out = node(nt, "ShaderNodeOutputMaterial", (1600, 0))
     uvn = _attr(nt, "uvn", (-1600, 300))
@@ -94,9 +95,9 @@ def feather_material(name="Feather", rough=0.55, sheen=0.35, barb_mm=0.24,
     down = _mixc(nt, 0.55, fcol.outputs["Color"], (0.05, 0.05, 0.055, 1), loc=(-600, -500))
     dfac = _math(nt, "SUBTRACT", 1.0, _ss(nt, 0.10, 0.42, u), loc=(-600, -650))
     col = _mixc(nt, dfac, fcol.outputs["Color"], down, loc=(-400, -650))
-    rw = _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, _math(nt, "MULTIPLY", u, 0.55)), 0.11, loc=(-600, -800))
+    rw = _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, _math(nt, "MULTIPLY", u, 0.55)), shaft_w, loc=(-600, -800))
     rmask = _math(nt, "SUBTRACT", 1.0, _ss(nt, 0.0, 1.0, _math(nt, "DIVIDE", av, rw)), loc=(-400, -800))
-    col = _mixc(nt, rmask, col, scol.outputs["Color"], loc=(-200, -650))
+    col = _mixc(nt, _math(nt, "MULTIPLY", rmask, shaft_mix), col, scol.outputs["Color"], loc=(-200, -650))
     shade = _math(nt, "ADD", 0.86, _math(nt, "MULTIPLY", stripe, 0.14), loc=(-200, -850))
     col = _mixc(nt, 1.0, col, shade, loc=(0, -650), blend="MULTIPLY")
     # micro relief from barbs
@@ -205,11 +206,11 @@ def iris_material(radius):
     fib.inputs["Scale"].default_value = 1.5
     fib.inputs["Detail"].default_value = 8.0
     link(nt, cc.outputs[0], fib.inputs["Vector"])
-    iris_a = (0.20, 0.085, 0.030, 1)
-    iris_b = (0.09, 0.035, 0.012, 1)
+    iris_a = (0.050, 0.020, 0.007, 1)
+    iris_b = (0.016, 0.006, 0.002, 1)
     iris = _mixc(nt, fib.outputs["Fac"], iris_a, iris_b, loc=(-300, -300))
     # warmer ring near the pupil, dark limbal ring
-    iris = _mixc(nt, _math(nt, "MULTIPLY", _ss(nt, 0.60, 0.42, rho), 0.5), iris, (0.30, 0.13, 0.04, 1), loc=(-150, -300))
+    iris = _mixc(nt, _math(nt, "MULTIPLY", _ss(nt, 0.60, 0.42, rho), 0.5), iris, (0.045, 0.018, 0.006, 1), loc=(-150, -300))
     iris = _mixc(nt, _ss(nt, 0.70, 0.86, rho), iris, (0.02, 0.012, 0.008, 1), loc=(0, -300))
     pupil = _ss(nt, 0.36, 0.33, rho, loc=(0, -100))
     col = _mixc(nt, pupil, iris, (0.003, 0.003, 0.003, 1), loc=(200, -200))
@@ -245,5 +246,107 @@ def simple(name, col, rough=0.5, spec=0.5, coat=0.0, sss=0.0):
     b.inputs["Roughness"].default_value = rough
     b.inputs["Specular IOR Level"].default_value = spec
     b.inputs["Coat Weight"].default_value = coat
+    link(nt, b.outputs[0], out.inputs["Surface"])
+    return m
+
+
+def strand_material(name="Fluff"):
+    m, nt = new_mat(name)
+    out = node(nt, "ShaderNodeOutputMaterial", (600, 0))
+    a = _attr(nt, "fcol", (-400, 0))
+    hi = node(nt, "ShaderNodeHairInfo", (-400, -250))
+    # strands darken toward the root (self-shadowed down)
+    f = _ss(nt, 0.0, 0.6, hi.outputs["Intercept"], loc=(-200, -250))
+    c = _mixc(nt, f, (0.03, 0.03, 0.035, 1), a.outputs["Color"], loc=(0, 0))
+    b = node(nt, "ShaderNodeBsdfPrincipled", (250, 0))
+    link(nt, c, b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 0.5
+    b.inputs["Sheen Weight"].default_value = 0.4
+    tr = node(nt, "ShaderNodeBsdfTranslucent", (250, -300))
+    link(nt, c, tr.inputs["Color"])
+    mx = node(nt, "ShaderNodeMixShader", (450, 0))
+    mx.inputs[0].default_value = 0.3
+    link(nt, b.outputs[0], mx.inputs[1])
+    link(nt, tr.outputs[0], mx.inputs[2])
+    link(nt, mx.outputs[0], out.inputs["Surface"])
+    return m
+
+
+def foot_material():
+    """Yellow-olive scutate toes: transverse scales along the toe."""
+    m, nt = new_mat("Feet")
+    out = node(nt, "ShaderNodeOutputMaterial", (900, 0))
+    uv = node(nt, "ShaderNodeUVMap", (-1200, 0), uv_map="UVMap")
+    sep = node(nt, "ShaderNodeSeparateXYZ", (-1000, 0))
+    link(nt, uv.outputs[0], sep.inputs[0])
+    # scutes ~1.1 mm apart along the toe (V is metres along)
+    ph = _math(nt, "MULTIPLY", sep.outputs["Y"], 6.2832 / 0.0011, loc=(-800, 0))
+    wob = node(nt, "ShaderNodeTexNoise", (-1000, -300))
+    wob.inputs["Scale"].default_value = 3.0
+    link(nt, uv.outputs[0], wob.inputs["Vector"])
+    ph = _math(nt, "ADD", ph, _math(nt, "MULTIPLY", wob.outputs["Fac"], 2.0), loc=(-650, 0))
+    band = _math(nt, "MULTIPLY", _math(nt, "ADD", _math(nt, "SINE", ph), 1.0), 0.5, loc=(-500, 0))
+    groove = _ss(nt, 0.08, 0.35, band, loc=(-350, 0))
+    tc = node(nt, "ShaderNodeTexCoord", (-1000, -500))
+    nz = node(nt, "ShaderNodeTexNoise", (-800, -500))
+    nz.inputs["Scale"].default_value = 1500.0
+    nz.inputs["Detail"].default_value = 5.0
+    link(nt, tc.outputs["Object"], nz.inputs["Vector"])
+    base = _mixc(nt, nz.outputs["Fac"], srgb(0.72, 0.60, 0.30), srgb(0.55, 0.46, 0.24), loc=(-300, -300))
+    col = _mixc(nt, _math(nt, "ADD", groove, 0.45, clamp=True), srgb(0.30, 0.24, 0.12), base, loc=(-100, -200))
+    b = node(nt, "ShaderNodeBsdfPrincipled", (300, 0))
+    link(nt, col, b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 0.55
+    b.inputs["Subsurface Weight"].default_value = 0.15
+    b.inputs["Subsurface Radius"].default_value = (0.001, 0.0006, 0.0003)
+    bump = node(nt, "ShaderNodeBump", (100, -500))
+    bump.inputs["Strength"].default_value = 0.6
+    bump.inputs["Distance"].default_value = 0.0002
+    link(nt, groove, bump.inputs["Height"])
+    link(nt, bump.outputs["Normal"], b.inputs["Normal"])
+    link(nt, b.outputs[0], out.inputs["Surface"])
+    return m
+
+
+def bark_material():
+    """Sun-bleached dead acacia twig: grey-tan, split and cracked."""
+    m, nt = new_mat("Bark")
+    out = node(nt, "ShaderNodeOutputMaterial", (1200, 0))
+    uv = node(nt, "ShaderNodeUVMap", (-1400, 0), uv_map="UVMap")
+    mp = node(nt, "ShaderNodeMapping", (-1200, 0))
+    mp.inputs["Scale"].default_value = (6.0, 12.0, 1.0)  # stretch features along the wood
+    link(nt, uv.outputs[0], mp.inputs["Vector"])
+    mp2 = node(nt, "ShaderNodeMapping", (-1200, -300))
+    mp2.inputs["Scale"].default_value = (14.0, 45.0, 1.0)
+    link(nt, uv.outputs[0], mp2.inputs["Vector"])
+    big = node(nt, "ShaderNodeTexNoise", (-1000, 0))
+    big.inputs["Scale"].default_value = 3.0
+    big.inputs["Detail"].default_value = 8.0
+    big.inputs["Roughness"].default_value = 0.6
+    link(nt, mp.outputs[0], big.inputs["Vector"])
+    vor = node(nt, "ShaderNodeTexVoronoi", (-1000, -300), feature="DISTANCE_TO_EDGE")
+    vor.inputs["Scale"].default_value = 1.0
+    vor.inputs["Randomness"].default_value = 1.0
+    link(nt, mp2.outputs[0], vor.inputs["Vector"])
+    crack = _ss(nt, 0.0, 0.035, vor.outputs["Distance"], loc=(-800, -300))
+    fine = node(nt, "ShaderNodeTexNoise", (-1000, -600))
+    fine.inputs["Scale"].default_value = 25.0
+    fine.inputs["Detail"].default_value = 10.0
+    link(nt, mp.outputs[0], fine.inputs["Vector"])
+    light = srgb(0.70, 0.66, 0.60)
+    warm = srgb(0.58, 0.49, 0.40)
+    grey = srgb(0.50, 0.49, 0.47)
+    c = _mixc(nt, big.outputs["Fac"], light, warm, loc=(-600, 0))
+    c = _mixc(nt, _ss(nt, 0.45, 0.75, fine.outputs["Fac"]), c, grey, loc=(-400, 0))
+    c = _mixc(nt, _math(nt, "ADD", crack, 0.35, clamp=True), srgb(0.25, 0.21, 0.17), c, loc=(-200, 0))
+    b = node(nt, "ShaderNodeBsdfPrincipled", (400, 0))
+    link(nt, c, b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 0.85
+    h = _math(nt, "ADD", _math(nt, "MULTIPLY", crack, 0.6), _math(nt, "MULTIPLY", fine.outputs["Fac"], 0.4), loc=(-200, -400))
+    bump = node(nt, "ShaderNodeBump", (100, -400))
+    bump.inputs["Strength"].default_value = 0.9
+    bump.inputs["Distance"].default_value = 0.0006
+    link(nt, h, bump.inputs["Height"])
+    link(nt, bump.outputs["Normal"], b.inputs["Normal"])
     link(nt, b.outputs[0], out.inputs["Surface"])
     return m

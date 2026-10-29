@@ -24,7 +24,7 @@ C = {k: np.array(v) for k, v in dict(
     crown=(0.66, 0.70, 0.46), crown2=(0.48, 0.66, 0.50), nape=(0.36, 0.60, 0.55),
     white=(0.93, 0.91, 0.84), stripe=(0.045, 0.04, 0.035), cheek=(0.86, 0.46, 0.30),
     chin=(0.91, 0.82, 0.82), lilac=(0.80, 0.39, 0.66), lilac2=(0.70, 0.36, 0.70),
-    rufneck=(0.84, 0.50, 0.40), turq=(0.17, 0.60, 0.65), turq2=(0.38, 0.73, 0.73),
+    rufneck=(0.84, 0.50, 0.40), turq=(0.22, 0.66, 0.70), turq2=(0.45, 0.78, 0.78),
     brown=(0.63, 0.41, 0.21), rump=(0.22, 0.24, 0.66), shaft=(0.97, 0.94, 0.96),
 ).items()}
 
@@ -79,13 +79,14 @@ def head_fields(P, N):
     side = ss(0.004, 0.009, ax)
     half = 0.0030 + 0.0008 * ss(0.03, 0.02, np.abs(y - ey))
     stripe = (1 - ss(half - 0.0006, half + 0.0006, np.abs(dz))) * span * side
-    sup = ss(0.0026, 0.0036, dz) * (1 - ss(0.0066, 0.0078, dz)) * ss(0.014, 0.020, y) * side
-    forehead = ss(0.034, 0.040, y) * ss(0.126, 0.129, z) * (1 - stripe)
+    sup = ss(0.0026, 0.0034, dz) * (1 - ss(0.0056, 0.0066, dz)) * ss(0.014, 0.020, y) * side
+    forehead = ss(0.041, 0.046, y) * ss(0.126, 0.129, z) * (1 - stripe)
     crown = mix(C["nape"], C["crown2"], ss(-0.004, 0.012, y))
     crown = mix(crown, C["crown"], ss(0.016, 0.030, y))
     below = 1 - ss(-0.004, -0.002, dz)
     cheek = mix(C["cheek"], C["lilac"], ss(0.112, 0.100, z) + ss(0.012, 0.004, ax) * 0.6)
-    col = mix(crown, cheek, below)
+    cheek_zone = ss(ey - 0.024, ey - 0.010, y) * ss(0.002, 0.010, ax)
+    col = mix(crown, cheek, below * cheek_zone)
     chin = ss(0.034, 0.040, y) * ss(0.124, 0.118, z) * ss(0.011, 0.006, ax)
     col = mix(col, C["chin"], chin)
     col = mix(col, C["white"], np.clip(sup + forehead, 0, 1))
@@ -203,7 +204,7 @@ def contour_outline(u):
 
 
 def build_cards(roots, normals, flows, L, W, T, colors, shaft_cols, drape,
-                outline=contour_outline, curl=0.16, sink=0.0006, tip_jitter=0.28,
+                outline=contour_outline, curl=0.08, sink=0.0003, tip_jitter=0.10,
                 avoid=None):
     """Draped feather cards. Returns verts, faces, attribute dict."""
     n = len(roots)
@@ -254,7 +255,49 @@ def build_cards(roots, normals, flows, L, W, T, colors, shaft_cols, drape,
     return verts, faces, attrs
 
 
-def coat(V, Fc, Nv, head, inside_reject=None, coverage=3.6, avoid=None):
+def fluff(V, F, Nv, head, n, inside_reject=None, avoid=None, segs=6):
+    """Loose barbs / afterfeather strands lying in the plumage surface."""
+    fields = head_fields if head else body_fields
+    tri = V[F]
+    area = 0.5 * np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1)
+    fi = RNG.choice(len(F), size=int(n * 1.3), p=area / area.sum())
+    r1 = np.sqrt(RNG.random(len(fi)))
+    r2 = RNG.random(len(fi))
+    P0 = np.einsum("ij,ijk->ik", np.c_[1 - r1, r1 * (1 - r2), r1 * r2], tri[fi])
+    if inside_reject is not None:
+        P0 = P0[~inside_reject(P0)]
+    P0 = P0[:n]
+    drape = Drape(V, Nv)
+    S0, N0 = drape.project(P0)
+    col, streak, L, W, T = fields(S0, N0)
+    fl = flow_field(S0, head)
+    t = fl - N0 * np.einsum("ij,ij->i", fl, N0)[:, None]
+    t /= np.linalg.norm(t, axis=1, keepdims=True)
+    b = np.cross(N0, t)
+    ang = RNG.normal(0, 0.35, len(S0))
+    t = t * np.cos(ang)[:, None] + b * np.sin(ang)[:, None]
+    ln = L * RNG.uniform(0.45, 1.0, len(S0))
+    tip = T * RNG.uniform(0.85, 1.25, len(S0))
+    u = np.linspace(0, 1, segs)
+    # barbs are gently curved, not straight hairs
+    bend = RNG.normal(0, 0.18, len(S0))[:, None] * ln[:, None] * u[None] ** 2
+    X = (S0[:, None] + t[:, None] * (ln[:, None] * u[None])[..., None]
+         + b[:, None] * bend[..., None])
+    Sx, Nx = drape.project(X.reshape(-1, 3))
+    h = (-0.0003 + (tip[:, None] + 0.0003) * (1 - (1 - u[None]) ** 2.2)).reshape(-1)
+    pos = Sx + Nx * h[:, None]
+    if avoid is not None:
+        for c, r in avoid:
+            d = pos - c
+            dist = np.linalg.norm(d, axis=-1, keepdims=True)
+            pos = pos + d / np.maximum(dist, 1e-9) * np.clip(r - dist, 0, None)
+    col = np.clip(col * RNG.normal(1.0, 0.07, (len(col), 1)), 0, 1)
+    white = (RNG.random(len(col)) < 0.10 * streak)[:, None]
+    col = np.where(white, mix(col, C["shaft"], np.full(len(col), 0.6)), col)
+    return pos.reshape(len(S0), segs, 3), srgb_np(col)
+
+
+def coat(V, Fc, Nv, head, inside_reject=None, coverage=4.2, avoid=None):
     """V, Fc: surface mesh in bird space; Nv: vertex normals."""
     fields = head_fields if head else body_fields
     roots, normals = scatter(V, Fc, fields, coverage, inside_reject)

@@ -80,7 +80,7 @@ def build_bill():
             cl = c + up * (g - 0.0004 - 0.0012 * tl ** 2)
             pts = [cl + lat * xi + up * zi for xi, zi in zip(x, z)]
             lower.append((pts, u, t))
-    tip_u = BILL_BASE + fwd * (BILL_LEN + 0.0010) + up * (culmen_drop(1.0) - 0.0012)
+    tip_u = BILL_BASE + fwd * (BILL_LEN + 0.0007) + up * (culmen_drop(1.0) * 0.80)
     tip_l = BILL_BASE + fwd * (BILL_LEN * 0.95) + up * (gape(0.95) - 0.0020)
     U = _loft(upper, [tip_u])
     L = _loft(lower, [tip_l])

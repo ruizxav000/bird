@@ -137,3 +137,21 @@ def tube(points, radii, sides=12, cap=True, twist_ref=(0, 0, 1)):
             a = (n - 1) * w + j
             faces.append((a, a + 1, tip))
     return np.array(verts), faces, np.array(uv)
+
+
+def curves_object(name, pos, r_root, r_tip, point_attrs=None, curve_attrs=None, collection=None):
+    """pos: (n_curves, n_points, 3)."""
+    n, k, _ = pos.shape
+    hc = bpy.data.hair_curves.new(name)
+    hc.add_curves([k] * n)
+    hc.position_data.foreach_set("vector", pos.astype(np.float32).ravel())
+    rad = np.tile(np.linspace(r_root, r_tip, k), n).astype(np.float32)
+    ra = hc.attributes.get("radius") or hc.attributes.new("radius", "FLOAT", "POINT")
+    ra.data.foreach_set("value", rad)
+    for nm, (kind, val) in (curve_attrs or {}).items():
+        a = hc.attributes.new(nm, kind, "CURVE")
+        a.data.foreach_set("color" if kind == "FLOAT_COLOR" else "value",
+                           np.asarray(val, np.float32).ravel())
+    ob = bpy.data.objects.new(name, hc)
+    (collection or bpy.context.scene.collection).objects.link(ob)
+    return ob

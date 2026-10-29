@@ -57,27 +57,27 @@ def polygonize(fn, lo, hi, step):
     vol = fn(G)
     verts, faces, _, _ = measure.marching_cubes(vol, 0.0, spacing=(step,) * 3)
     verts += lo
-    # marching_cubes winds faces so normals point toward lower values; flip
-    faces = faces[:, ::-1]
+    # marching_cubes winds faces with normals toward higher values (outside
+    # of an SDF), which is what we want
     return verts, faces
 
 
 # ---------------------------------------------------------------- the bird
-BODY_TILT = 55.0  # torso long axis, degrees above horizontal
+BODY_TILT = 62.0  # torso long axis, degrees above horizontal
 
 HEAD_PIVOT = np.array([0.0, 0.010, 0.100])
-EYE_C = np.array([0.0196, 0.0300, 0.1300])  # right eye centre (mirror for left)
+EYE_C = np.array([0.0206, 0.0300, 0.1300])  # right eye centre (mirror for left)
 EYE_R = 0.0052
 BILL_BASE = np.array([0.0, 0.0470, 0.1255])
 
 
 def body_sdf(P):
     R = rot_x(BODY_TILT)
-    torso = ellipsoid(P, (0, -0.014, 0.060), (0.037, 0.060, 0.041), R)
-    breast = ellipsoid(P, (0, 0.020, 0.076), (0.035, 0.030, 0.040))
-    belly = ellipsoid(P, (0, 0.004, 0.036), (0.032, 0.031, 0.030))
+    torso = ellipsoid(P, (0, -0.012, 0.058), (0.036, 0.060, 0.034), R)
+    breast = ellipsoid(P, (0, 0.020, 0.078), (0.034, 0.028, 0.040))
+    belly = ellipsoid(P, (0, 0.006, 0.035), (0.030, 0.025, 0.028))
     tail = capsule(P, (0, -0.042, 0.026), (0, -0.080, -0.008), 0.014, 0.006)
-    neck = capsule(P, (0, -0.002, 0.080), (0, 0.010, 0.112), 0.024, 0.021)
+    neck = capsule(P, (0, -0.002, 0.080), (0, 0.009, 0.110), 0.027, 0.0245)
     d = smin(torso, breast, 0.020)
     d = smin(d, belly, 0.020)
     d = smin(d, tail, 0.015)
@@ -86,7 +86,7 @@ def body_sdf(P):
 
 
 def head_sdf(P):
-    skull = ellipsoid(P, (0, 0.019, 0.1285), (0.0235, 0.0295, 0.0215))
+    skull = ellipsoid(P, (0, 0.0165, 0.1290), (0.0255, 0.0330, 0.0240))
     # face narrows into the bill base
     face = capsule(P, (0, 0.030, 0.1275), BILL_BASE + (0, 0.004, 0), 0.0150, 0.0062)
     # throat / chin pulled down and forward
