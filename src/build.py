@@ -128,9 +128,9 @@ def build_camera_light(sc):
     cd4.lens = 1800
 
     sun_d = bpy.data.lights.new("Sun", "SUN")
-    sun_d.energy = 9.0
+    sun_d.energy = 12.0
     sun_d.angle = math.radians(1.5)
-    sun_d.color = (1.0, 0.80, 0.60)
+    sun_d.color = (1.0, 0.76, 0.52)
     sun = bpy.data.objects.new("Sun", sun_d)
     sc.collection.objects.link(sun)
     # low golden-hour sun, front-right of the bird (it lights the face)
@@ -152,9 +152,9 @@ def build_world(sc):
     sep = util.node(nt, "ShaderNodeSeparateXYZ", (-600, 200))
     ramp = util.node(nt, "ShaderNodeValToRGB", (-400, 200))
     ramp.color_ramp.elements[0].position = 0.40
-    ramp.color_ramp.elements[0].color = srgb(0.60, 0.77, 0.80)
+    ramp.color_ramp.elements[0].color = srgb(0.56, 0.80, 0.86)
     ramp.color_ramp.elements[1].position = 0.60
-    ramp.color_ramp.elements[1].color = srgb(0.53, 0.72, 0.78)
+    ramp.color_ramp.elements[1].color = srgb(0.48, 0.75, 0.84)
     mr = util.node(nt, "ShaderNodeMapRange", (-500, 50))
     mr.inputs["From Min"].default_value = -0.3
     mr.inputs["From Max"].default_value = 0.3
@@ -176,7 +176,7 @@ def build_world(sc):
     util.link(nt, sep.outputs["Z"], mr2.inputs["Value"])
     util.link(nt, mr2.outputs["Result"], sky.inputs["Fac"])
     bg_lit = util.node(nt, "ShaderNodeBackground", (-100, -200))
-    bg_lit.inputs["Strength"].default_value = 0.6
+    bg_lit.inputs["Strength"].default_value = 0.5
     util.link(nt, sky.outputs["Color"], bg_lit.inputs["Color"])
     lp = util.node(nt, "ShaderNodeLightPath", (-100, 450))
     mix = util.node(nt, "ShaderNodeMixShader", (400, 0))
@@ -199,12 +199,25 @@ def setup_render(sc, preview):
     sc.view_settings.view_transform = "AgX"
     sc.view_settings.look = "AgX - Medium High Contrast"
     sc.render.fps = 24
+    sc.cycles.use_adaptive_sampling = True
+    sc.cycles.adaptive_threshold = 0.015
+    sc.cycles.transparent_max_bounces = 40
+    sc.cycles.max_bounces = 8
+    sc.cycles.denoiser = "OPENIMAGEDENOISE"
+    # a real shutter: head snaps smear slightly, holds stay crisp
+    sc.render.use_motion_blur = True
+    sc.render.motion_blur_shutter = 0.5
+    # long lens at ~5 m, f/5.6: the far side of the bird falls slightly soft
+    cam = sc.camera
+    cam.data.dof.use_dof = True
+    cam.data.dof.aperture_fstop = 5.6
+    cam.data.dof.focus_distance = (cam.location - Vector((0.0, 0.03, 0.125))).length - 0.02
 
 
 def build_coats(sc, body, head, pivot):
     import plumage
     import materials as M
-    fm = M.feather_material("FeatherContour", fray=0.55, translucency=0.3)
+    fm = M.feather_material("FeatherContour", fray=0.60, translucency=0.3)
     down = M.skin_material()
     strand = M.strand_material()
     eye_avoid = [(sdf.EYE_C * (sx, 1, 1), sdf.EYE_R + 0.0009) for sx in (1, -1)]
@@ -234,7 +247,7 @@ def build_coats(sc, body, head, pivot):
         util.set_point_attr(me, "fcol", np.c_[util.srgb_np(col), np.ones(len(col))], "FLOAT_COLOR")
         me.materials.append(down)
         out.append(co)
-        n_fl = 60000 if is_head else 150000
+        n_fl = 55000 if is_head else 120000
         fp, fc = plumage.fluff(V, F, N, is_head, n_fl, reject, avoid=eye_avoid if is_head else None)
         fo = util.curves_object(ob.name + "Fluff", fp - off, 0.00003, 0.000008,
                                 curve_attrs={"fcol": ("FLOAT_COLOR", np.c_[fc, np.ones(len(fc))])})
@@ -259,8 +272,9 @@ def attach_cards(name, verts, faces, at, mat, parent=None):
 def build_wings(sc):
     import wing
     import materials as M
-    wm = M.feather_material("FeatherWing", rough=0.42, sheen=0.25, fray=0.12,
-                            translucency=0.15, gloss=0.12, shaft_w=0.035, shaft_mix=0.8)
+    wm = M.feather_material("FeatherWing", rough=0.38, sheen=0.3, fray=0.16,
+                            translucency=0.15, gloss=0.18, shaft_w=0.035, shaft_mix=0.8,
+                            thin_film=380.0, bump_str=0.18)
     surf = wing.SideSurface(0.0060)
     obs = []
     for sx in (1, -1):
@@ -272,6 +286,8 @@ def build_wings(sc):
     cm = bpy.data.materials["FeatherContour"]
     for sx in (1, -1):
         roots, normals = wing.overlap_roots(hi, sx)
+        if len(roots) == 0:
+            continue
         col, streak, L, W, T = plumage.body_fields(roots, normals)
         flows = plumage.flow_field(roots, False)
         shaft = plumage.mix(col * 0.92, plumage.C["shaft"], np.clip(streak * 0.95, 0, 1))
@@ -313,12 +329,40 @@ def main():
     for b in bill:
         b.data.materials.append(bm)
     im, cm = M.iris_material(sdf.EYE_R), M.cornea_material()
-    lm = M.simple("Lid", (0.035, 0.030, 0.030), rough=0.3, spec=0.6)
+    lm = M.simple("Lid", (0.03, 0.027, 0.026), rough=0.55, spec=0.4)
     for e in eyes:
         e.data.materials.append(im)
         for ch in e.children:
             ch.data.materials.append(cm if ch.name.startswith("Cornea") else lm)
     build_feet_branch(sc)
+    blinks = []
+    for e in eyes:
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=sdf.EYE_R * 1.07)
+        cap = bpy.context.object
+        cap.name = "Blink_" + e.name[-1]
+        me = cap.data
+        import bmesh
+        bm_ = bmesh.new()
+        bm_.from_mesh(me)
+        bmesh.ops.delete(bm_, geom=[v for v in bm_.verts if v.co.z < sdf.EYE_R * 0.15], context="VERTS")
+        bm_.to_mesh(me)
+        bm_.free()
+        bpy.ops.object.shade_smooth()
+        cap.parent = e
+        cap.data.materials.append(lm)
+        blinks.append(cap)
+    rig = bpy.data.objects.new("BodyRig", None)
+    sc.collection.objects.link(rig)
+    rig.location = (0, 0, 0.03)
+    bpy.context.view_layer.update()
+    for name in ("Body", "BodyFeathers", "BodyFluff", "Wing_R", "Wing_L", "TailPivot", "HeadPivot"):
+        ob = bpy.data.objects[name]
+        mw = ob.matrix_world.copy()
+        ob.parent = rig
+        ob.matrix_parent_inverse = rig.matrix_world.inverted()
+        ob.matrix_world = mw
+    import anim
+    anim.animate(sc, bpy.data.objects["HeadPivot"], rig, bpy.data.objects["TailPivot"], blinks)
     build_camera_light(sc)
     build_world(sc)
     setup_render(sc, preview)

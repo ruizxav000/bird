@@ -280,7 +280,7 @@ def tail_specs():
                 colfn=central if i == 0 else (stream if outer else side),
                 shaft=(0.05, 0.06, 0.08), droop=0.010 if outer else 0.004,
                 curl=0.10, roll=-sx * (6 + 7 * i),
-                splay=X * sx * (0.0035 + 0.0020 * i + (0.016 if outer else 0)) - up * (0.0008 * i + (0.0035 * sx + 0.002 if outer else 0))))
+                splay=X * sx * (0.0035 + 0.0020 * i + (0.016 if outer else 0)) - up * (0.0008 * i + (0.010 * sx + 0.002 if outer else 0))))
     # upper-tail coverts (violet-blue rump) and under-tail coverts (pale turquoise)
     utc = _edged(_grad([(0, COL["violet"]), (1, COL["ultra"] * 1.1)]), COL["ultra"] * 1.3, 0.3)
     ltc = _grad([(0, COL["turq"]), (1, COL["turq_edge"])])
@@ -297,7 +297,7 @@ def tail_specs():
     return S
 
 
-def overlap_roots(surf, sx, n_front=34, n_flank=40):
+def overlap_roots(surf, sx, n_front=0, n_flank=0):
     """Breast feathers spilling over the bend of the wing and flank
     feathers tucked over its lower edge."""
     pts = []
@@ -305,5 +305,7 @@ def overlap_roots(surf, sx, n_front=34, n_flank=40):
         pts.append(profile(RNG.uniform(-0.026, -0.012), RNG.uniform(-0.016, 0.020)))
     for _ in range(n_flank):
         pts.append(profile(RNG.uniform(0.0, 0.085), RNG.uniform(-0.030, -0.022)))
+    if not pts:
+        return np.zeros((0, 3)), np.zeros((0, 3))
     roots, normals = zip(*[surf.side_point(p, sx) for p in pts])
     return np.array(roots), np.array(normals)

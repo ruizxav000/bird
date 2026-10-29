@@ -65,7 +65,7 @@ def body_fields(P, N):
     near_tail = ss(-0.03, -0.065, y)
     L = L * (1 - 0.15 * near_tail)
     T = T * (1 - 0.30 * near_tail)
-    W = 0.55 * L
+    W = 0.46 * L
     return col, streak, L, W, T
 
 
@@ -108,7 +108,7 @@ def head_fields(P, N):
     T = T * (0.5 + 0.5 * ss(0.0008, 0.006, d_eye))
     L = mix(L[:, None], bL[:, None], tb)[:, 0]
     T = mix(T[:, None], bT[:, None], tb)[:, 0]
-    W = 0.60 * L
+    W = 0.52 * L
     return col, streak, L, W, T
 
 
@@ -198,9 +198,9 @@ NU, NV = 10, 7
 
 
 def contour_outline(u):
-    w = np.where(u < 0.55, 0.42 + 0.58 * np.sin(0.5 * np.pi * np.minimum(u / 0.55, 1)),
-                 np.sqrt(np.clip(1 - ((u - 0.55) / 0.47) ** 2, 0, 1)))
-    return np.maximum(w, 0.06)
+    w = np.where(u < 0.5, 0.42 + 0.58 * np.sin(0.5 * np.pi * np.minimum(u / 0.5, 1)),
+                 np.clip(1 - ((u - 0.5) / 0.52) ** 2, 0, 1) ** 0.7)
+    return np.maximum(w, 0.05)
 
 
 def build_cards(roots, normals, flows, L, W, T, colors, shaft_cols, drape,
@@ -277,7 +277,7 @@ def fluff(V, F, Nv, head, n, inside_reject=None, avoid=None, segs=6):
     ang = RNG.normal(0, 0.35, len(S0))
     t = t * np.cos(ang)[:, None] + b * np.sin(ang)[:, None]
     ln = L * RNG.uniform(0.45, 1.0, len(S0))
-    tip = T * RNG.uniform(0.85, 1.25, len(S0))
+    tip = T * RNG.uniform(0.80, 1.15, len(S0))
     u = np.linspace(0, 1, segs)
     # barbs are gently curved, not straight hairs
     bend = RNG.normal(0, 0.18, len(S0))[:, None] * ln[:, None] * u[None] ** 2

@@ -2,3 +2,4 @@ scene/*.blend
 scene/*.blend1
 __pycache__/
 *.pyc
+renders/frames/

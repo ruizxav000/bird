@@ -52,7 +52,7 @@ def new_mat(name):
 
 def feather_material(name="Feather", rough=0.55, sheen=0.45, barb_mm=0.24,
                      barb_slope=0.9, fray=0.42, translucency=0.25, gloss=0.0,
-                     shaft_w=0.065, shaft_mix=0.75):
+                     shaft_w=0.065, shaft_mix=0.75, thin_film=0.0, bump_str=0.25):
     m, nt = new_mat(name)
     out = node(nt, "ShaderNodeOutputMaterial", (1600, 0))
     uvn = _attr(nt, "uvn", (-1600, 300))
@@ -102,7 +102,7 @@ def feather_material(name="Feather", rough=0.55, sheen=0.45, barb_mm=0.24,
     col = _mixc(nt, 1.0, col, shade, loc=(0, -650), blend="MULTIPLY")
     # micro relief from barbs
     bump = node(nt, "ShaderNodeBump", (100, -900))
-    bump.inputs["Strength"].default_value = 0.25
+    bump.inputs["Strength"].default_value = bump_str
     bump.inputs["Distance"].default_value = 0.00005
     link(nt, stripe, bump.inputs["Height"])
     bsdf = node(nt, "ShaderNodeBsdfPrincipled", (400, -400))
@@ -113,6 +113,10 @@ def feather_material(name="Feather", rough=0.55, sheen=0.45, barb_mm=0.24,
     bsdf.inputs["Sheen Roughness"].default_value = 0.35
     bsdf.inputs["Coat Weight"].default_value = gloss
     bsdf.inputs["Coat Roughness"].default_value = 0.25
+    if thin_film:
+        # structural (non-pigment) blues: faint angle-dependent shimmer
+        bsdf.inputs["Thin Film Thickness"].default_value = thin_film
+        bsdf.inputs["Thin Film IOR"].default_value = 1.45
     link(nt, bump.outputs["Normal"], bsdf.inputs["Normal"])
     tr = node(nt, "ShaderNodeBsdfTranslucent", (400, -100))
     link(nt, col, tr.inputs["Color"])
@@ -206,8 +210,8 @@ def iris_material(radius):
     fib.inputs["Scale"].default_value = 1.5
     fib.inputs["Detail"].default_value = 8.0
     link(nt, cc.outputs[0], fib.inputs["Vector"])
-    iris_a = (0.050, 0.020, 0.007, 1)
-    iris_b = (0.016, 0.006, 0.002, 1)
+    iris_a = (0.030, 0.012, 0.005, 1)
+    iris_b = (0.011, 0.004, 0.002, 1)
     iris = _mixc(nt, fib.outputs["Fac"], iris_a, iris_b, loc=(-300, -300))
     # warmer ring near the pupil, dark limbal ring
     iris = _mixc(nt, _math(nt, "MULTIPLY", _ss(nt, 0.60, 0.42, rho), 0.5), iris, (0.045, 0.018, 0.006, 1), loc=(-150, -300))
@@ -256,7 +260,7 @@ def strand_material(name="Fluff"):
     a = _attr(nt, "fcol", (-400, 0))
     hi = node(nt, "ShaderNodeHairInfo", (-400, -250))
     # strands darken toward the root (self-shadowed down)
-    f = _ss(nt, 0.0, 0.6, hi.outputs["Intercept"], loc=(-200, -250))
+    f = _ss(nt, 0.0, 0.3, hi.outputs["Intercept"], loc=(-200, -250))
     c = _mixc(nt, f, (0.03, 0.03, 0.035, 1), a.outputs["Color"], loc=(0, 0))
     b = node(nt, "ShaderNodeBsdfPrincipled", (250, 0))
     link(nt, c, b.inputs["Base Color"])
@@ -333,9 +337,9 @@ def bark_material():
     fine.inputs["Scale"].default_value = 25.0
     fine.inputs["Detail"].default_value = 10.0
     link(nt, mp.outputs[0], fine.inputs["Vector"])
-    light = srgb(0.70, 0.66, 0.60)
-    warm = srgb(0.58, 0.49, 0.40)
-    grey = srgb(0.50, 0.49, 0.47)
+    light = srgb(0.62, 0.58, 0.53)
+    warm = srgb(0.52, 0.43, 0.35)
+    grey = srgb(0.42, 0.41, 0.40)
     c = _mixc(nt, big.outputs["Fac"], light, warm, loc=(-600, 0))
     c = _mixc(nt, _ss(nt, 0.45, 0.75, fine.outputs["Fac"]), c, grey, loc=(-400, 0))
     c = _mixc(nt, _math(nt, "ADD", crack, 0.35, clamp=True), srgb(0.25, 0.21, 0.17), c, loc=(-200, 0))

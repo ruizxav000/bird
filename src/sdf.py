@@ -66,7 +66,7 @@ def polygonize(fn, lo, hi, step):
 BODY_TILT = 62.0  # torso long axis, degrees above horizontal
 
 HEAD_PIVOT = np.array([0.0, 0.010, 0.100])
-EYE_C = np.array([0.0206, 0.0300, 0.1300])  # right eye centre (mirror for left)
+EYE_C = np.array([0.0199, 0.0300, 0.1300])  # right eye centre (mirror for left)
 EYE_R = 0.0052
 BILL_BASE = np.array([0.0, 0.0470, 0.1255])
 
